@@ -1,58 +1,56 @@
 from flask import Flask, request
 import requests
+import os
 
 app = Flask(__name__)
 
-# 🔐 Înlocuiește aceste valori cu datele tale reale
-TELEGRAM_BOT_TOKEN = "PASTEAZĂ_AICI_TOKENUL_TĂU"
-TELEGRAM_CHAT_ID = "PASTEAZĂ_AICI_CHAT_ID"
+# Poți folosi variabile din Environment sau direct valori hardcodate
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "8107923831:AAEijMxg3rw-CdWRMICbAIJURWFj5LW2tEs")
+CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "1974404417")
 
-@app.route('/', methods=['POST'])
+@app.route("/", methods=["GET"])
+def home():
+    return "✅ Webhook activ"
+
+@app.route("/webhook", methods=["POST"])
 def webhook():
     try:
-        data = request.get_json()
+        data = request.json.get("message")
+        if not data:
+            return {"error": "No 'message' in payload"}, 400
 
-        # Validare: toate cheile trebuie să fie prezente
-        expected_keys = ['symbol', 'direction', 'timeframe', 'entry', 'tp', 'sl']
-        if not all(k in data for k in expected_keys):
-            return '[ERROR] Date incomplete în fișier.', 400
+        symbol = data.get("symbol")
+        direction = data.get("direction")
+        timeframe = data.get("timeframe")
+        entry = data.get("entry")
+        tp = data.get("tp")
+        sl = data.get("sl")
 
-        # Extragem valorile
-        symbol = data['symbol']
-        direction = data['direction']
-        timeframe = data['timeframe']
-        entry = data['entry']
-        tp = data['tp']
-        sl = data['sl']
+        # Verificăm dacă toate valorile există
+        if not all([symbol, direction, timeframe, entry, tp, sl]):
+            return {"error": "Date incomplete"}, 400
 
-        # 🧾 Mesajul pentru Telegram
-        message = f"""📡 Semnal TradingView:
-🪙 Symbol: {symbol}
-📊 Direcție: {direction}
-⏱ Timeframe: {timeframe}
+        # Creăm mesajul pentru Telegram
+        message = f"""📊 Semnal TradingView:
+✅ {direction} {symbol} ({timeframe})
 🎯 Entry: {entry}
-✅ Take Profit: {tp}
-❌ Stop Loss: {sl}"""
+📈 TP: {tp}
+📉 SL: {sl}"""
 
-        # Trimitere mesaj
-        telegram_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+        send_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
         payload = {
-            "chat_id": TELEGRAM_CHAT_ID,
+            "chat_id": CHAT_ID,
             "text": message
         }
 
-        response = requests.post(telegram_url, json=payload)
+        response = requests.post(send_url, json=payload)
         if response.status_code != 200:
-            return f'[ERROR] Eroare Telegram: {response.text}', 500
+            return {"error": "Eroare la trimiterea pe Telegram"}, 500
 
-        return '[OK] Mesaj trimis pe Telegram.', 200
+        return {"status": "Mesaj trimis"}, 200
 
     except Exception as e:
-        return f'[EXCEPTION] {str(e)}', 500
+        return {"error": str(e)}, 500
 
-@app.route('/', methods=['GET'])
-def check():
-    return '✅ Webhook activ și funcțional.', 200
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=3000)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=3000)
