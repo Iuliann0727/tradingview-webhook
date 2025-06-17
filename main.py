@@ -1,56 +1,40 @@
 from flask import Flask, request
 import requests
-import os
+import json
 
 app = Flask(__name__)
 
-# Poți folosi variabile din Environment sau direct valori hardcodate
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "8107923831:AAEijMxg3rw-CdWRMICbAIJURWFj5LW2tEs")
-CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "1974404417")
+TELEGRAM_TOKEN = "8107923831:AAEijMxg3rw-CdWRMICbAIJURWFj5LW2tEs"
+CHAT_ID = "1974404417"
 
-@app.route("/", methods=["GET"])
-def home():
-    return "✅ Webhook activ"
-
-@app.route("/webhook", methods=["POST"])
+@app.route("/", methods=["POST"])
 def webhook():
     try:
-        data = request.json.get("message")
-        if not data:
-            return {"error": "No 'message' in payload"}, 400
+        data = request.get_json()
 
-        symbol = data.get("symbol")
-        direction = data.get("direction")
-        timeframe = data.get("timeframe")
-        entry = data.get("entry")
-        tp = data.get("tp")
-        sl = data.get("sl")
+        if not data or "message" not in data:
+            return {"status": "missing message"}, 400
 
-        # Verificăm dacă toate valorile există
-        if not all([symbol, direction, timeframe, entry, tp, sl]):
-            return {"error": "Date incomplete"}, 400
+        msg = data["message"]
 
-        # Creăm mesajul pentru Telegram
-        message = f"""📊 Semnal TradingView:
-✅ {direction} {symbol} ({timeframe})
-🎯 Entry: {entry}
-📈 TP: {tp}
-📉 SL: {sl}"""
+        text = f"📊 *Semnal TradingView*\n" \
+               f"➡️ Symbol: {msg.get('symbol')}\n" \
+               f"📈 Direction: {msg.get('direction')}\n" \
+               f"⏱ Timeframe: {msg.get('timeframe')}\n" \
+               f"🎯 Entry: {msg.get('entry')}\n" \
+               f"🏁 TP: {msg.get('tp')}\n" \
+               f"🛡 SL: {msg.get('sl')}"
 
-        send_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
         payload = {
             "chat_id": CHAT_ID,
-            "text": message
+            "text": text,
+            "parse_mode": "Markdown"
         }
 
-        response = requests.post(send_url, json=payload)
-        if response.status_code != 200:
-            return {"error": "Eroare la trimiterea pe Telegram"}, 500
-
-        return {"status": "Mesaj trimis"}, 200
+        requests.post(url, json=payload)
+        return {"status": "sent"}, 200
 
     except Exception as e:
-        return {"error": str(e)}, 500
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=3000)
+        print("Eroare:", e)
+        return {"status": "error", "detail": str(e)}, 500
