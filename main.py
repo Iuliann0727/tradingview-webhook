@@ -1,13 +1,13 @@
-from flask import Flask, request
-import json
-import os
+from flask import Flask, request, jsonify
 import requests
+import json
 
 app = Flask(__name__)
 
-# Telegram Bot Settings (înlocuiește cu valorile tale reale)
+# === AICI COMPLETEAZĂ CU DATELE TALE ===
 TELEGRAM_BOT_TOKEN = "8107923831:AAEijMxg3rw-CdWRMICbAIJURWFj5LW2tEs"
 TELEGRAM_CHAT_ID = "1974404417"
+# =======================================
 
 def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
@@ -21,27 +21,21 @@ def send_telegram_message(message):
 
 @app.route("/", methods=["POST"])
 def webhook():
-    data = request.get_json()
-
-    if not data or "message" not in data:
-        return {"status": "missing message"}, 400
-
-    msg = data["message"]
     try:
-        symbol = msg["symbol"]
-        direction = msg["direction"]
-        timeframe = msg["timeframe"]
-        entry = msg["entry"]
-        tp = msg["tp"]
-        sl = msg["sl"]
+        data = request.json.get("message", {})
+        symbol = data.get("symbol")
+        direction = data.get("direction")
+        timeframe = data.get("timeframe")
+        entry = data.get("entry")
+        tp = data.get("tp")
+        sl = data.get("sl")
 
-        # Formatăm mesajul pentru Telegram
-        text = f"📈 Semnal TradingView:\n\nSymbol: {symbol}\nDirection: {direction}\nTimeframe: {timeframe}\nEntry: {entry}\nTP: {tp}\nSL: {sl}"
-        send_telegram_message(text)
-        return {"status": "message sent"}, 200
+        message = f"📈 Signal:\nPair: {symbol}\nType: {direction}\nTF: {timeframe}\nEntry: {entry}\nTP: {tp}\nSL: {sl}"
+        send_telegram_message(message)
 
-    except KeyError:
-        return {"status": "incomplete data"}, 400
+        return jsonify({"status": "sent", "message": message}), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=80)
